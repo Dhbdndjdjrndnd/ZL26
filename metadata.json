@@ -1,0 +1,5 @@
+{
+  "name": "Zeltlager",
+  "description": "Eine umfassende Web-App zur Planung von Zeltlagern mit Zeitplan-Übersicht, CSV-Import, Gruppen-Zuweisung und einer zentralen Materialliste für die Küche.",
+  "requestFramePermissions": []
+}
