@@ -1,6 +1,7 @@
 
 import React, { useState, useMemo } from 'react';
-import { ProgramPoint, ProcurementType, User, DAYS } from '../types';
+// Removed DAYS from imports as it is not exported from '../types'
+import { ProgramPoint, ProcurementType, User } from '../types';
 import { Utensils, Scissors, Hammer, Package, Download, CheckCircle2, Circle, Calendar, ShoppingCart, Search, Layers, CalendarRange } from 'lucide-react';
 
 interface KitchenViewProps {
@@ -26,8 +27,9 @@ export const KitchenView: React.FC<KitchenViewProps> = ({ program, onToggleMater
 
     // 2. Sortieren nach chronologischem Ablauf (Tag-Index + Startzeit)
     const sortedProgram = [...filteredByTime].sort((a, b) => {
-      const dayIdxA = DAYS.indexOf(a.day);
-      const dayIdxB = DAYS.indexOf(b.day);
+      // Use the days prop instead of the missing DAYS constant for index lookup
+      const dayIdxA = days.indexOf(a.day);
+      const dayIdxB = days.indexOf(b.day);
       if (dayIdxA !== dayIdxB) return dayIdxA - dayIdxB;
       return a.startTime.localeCompare(b.startTime);
     });
@@ -42,7 +44,7 @@ export const KitchenView: React.FC<KitchenViewProps> = ({ program, onToggleMater
       isMyProgram: p.leaders.some(l => l.name === currentUser.displayName)
     })))
     .filter(m => activeType === 'Beides' || m.procurementType === activeType);
-  }, [program, selectedDay, activeType, timeScope, currentUser.displayName]);
+  }, [program, selectedDay, activeType, timeScope, currentUser.displayName, days]); // Added days to dependencies
 
   const getIcon = (cat: string) => {
     switch (cat) {

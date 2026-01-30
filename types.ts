@@ -1,11 +1,6 @@
 
 export type UserRole = 'ADMIN' | 'LEITER';
 
-export const DAYS = [
-  "Fr, 31.07.", "Sa, 01.08.", "So, 02.08.", "Mo, 03.08.", "Di, 04.08.",
-  "Mi, 05.08.", "Do, 06.08.", "Fr, 07.08.", "Sa, 08.08.", "So, 09.08."
-];
-
 export interface TimeSlotConfig {
   name: string;
   defaultStart: string;
@@ -91,3 +86,27 @@ export interface ProgramPoint {
   materials: Material[];
   groupHint?: string;
 }
+
+/**
+ * Generiert die Liste der Tage als Strings (z.B. "Fr, 31.07.") basierend auf Start- und Enddatum.
+ */
+export function generateDaysArray(startDateStr: string, endDateStr: string): string[] {
+  if (!startDateStr || !endDateStr) return [];
+  const start = new Date(startDateStr);
+  const end = new Date(endDateStr);
+  const result: string[] = [];
+  
+  let current = new Date(start);
+  while (current <= end) {
+    result.push(current.toLocaleDateString('de-DE', { 
+      weekday: 'short', 
+      day: '2-digit', 
+      month: '2-digit' 
+    }));
+    current.setDate(current.getDate() + 1);
+  }
+  return result;
+}
+
+export const DEFAULT_START_DATE = "2025-07-31";
+export const DEFAULT_END_DATE = "2025-08-09";

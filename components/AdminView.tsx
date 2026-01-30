@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
-import { GlobalLeader, GlobalGroup, User, UserRole, GroupMarker, TimeSlotConfig, LeaderAvailability, DAYS } from '../types';
-import { Trash2, ShieldCheck, Plus, FileUp, Key, RefreshCw, Palette, Clock, ChevronDown, ChevronRight, Check, Users, Database, Download, Lock, Save, HardDrive, AlertTriangle, Code, UserPlus, Edit2, CheckCircle2 } from 'lucide-react';
+import { GlobalLeader, GlobalGroup, User, UserRole, GroupMarker, TimeSlotConfig, LeaderAvailability } from '../types';
+import { Trash2, ShieldCheck, Plus, FileUp, Key, RefreshCw, Palette, Clock, ChevronDown, ChevronRight, Check, Users, Database, Download, Lock, Save, HardDrive, AlertTriangle, Code, UserPlus, Edit2, CheckCircle2, CalendarDays } from 'lucide-react';
 import { hashPassword } from '../services/securityUtils';
 
 interface AdminViewProps {
@@ -20,6 +20,10 @@ interface AdminViewProps {
   leaderPresence: LeaderAvailability;
   setLeaderPresence: React.Dispatch<React.SetStateAction<LeaderAvailability>>;
   addNotification: (msg: string, type?: 'error' | 'success' | 'info') => void;
+  startDate: string;
+  setStartDate: (d: string) => void;
+  endDate: string;
+  setEndDate: (d: string) => void;
   onSystemExport: (masterPassword: string) => void;
   onSystemImport: (e: React.ChangeEvent<HTMLInputElement>, pass: string) => void;
   onDeleteUser: (id: string) => void;
@@ -29,9 +33,10 @@ interface AdminViewProps {
   onDeleteGroup: (id: string) => void;
   onUpdateUserPassword: (id: string, hashedPass: string) => void;
   onResetApp: () => void;
+  days: string[];
 }
 
-type AdminSection = 'presence' | 'accounts' | 'markers' | 'groups' | 'slots' | 'backup' | 'hosting';
+type AdminSection = 'period' | 'presence' | 'accounts' | 'markers' | 'groups' | 'slots' | 'backup' | 'hosting';
 
 export const AdminView: React.FC<AdminViewProps> = ({ 
   leaders, groups, setLeaders, setGroups, 
@@ -39,11 +44,15 @@ export const AdminView: React.FC<AdminViewProps> = ({
   markers, setMarkers,
   onCsvUpload, isUploading,
   leaderPresence, setLeaderPresence,
-  addNotification, onSystemExport, onSystemImport,
+  addNotification,
+  startDate, setStartDate,
+  endDate, setEndDate,
+  onSystemExport, onSystemImport,
   onDeleteUser, onDeleteLeader, onDeleteMarker, onDeleteSlot, onDeleteGroup,
-  onUpdateUserPassword, onResetApp
+  onUpdateUserPassword, onResetApp,
+  days
 }) => {
-  const [activeSection, setActiveSection] = useState<AdminSection | null>('presence');
+  const [activeSection, setActiveSection] = useState<AdminSection | null>('period');
   
   // Form States
   const [leaderName, setLeaderName] = useState('');
@@ -52,25 +61,22 @@ export const AdminView: React.FC<AdminViewProps> = ({
   const [uPass, setUPass] = useState('');
   const [uRole, setURole] = useState<UserRole>('LEITER');
   
-  // Fix: Added missing state variables for marker and slot forms
   const [markerColor, setMarkerColor] = useState('#6366F1');
   const [newSlotName, setNewSlotName] = useState('');
   const [newSlotStart, setNewSlotStart] = useState('09:00');
   const [newSlotEnd, setNewSlotEnd] = useState('10:00');
   
   const [editingMarkerId, setEditingMarkerId] = useState<string | null>(null);
-  const [editingSlotIdx, setEditingSlotIdx] = useState<number | null>(null);
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
 
   const toggleSection = (section: AdminSection) => setActiveSection(prev => prev === section ? null : section);
 
-  // Anwesenheit: Alle Tage für einen Leiter umschalten (Doppelklick)
   const toggleAllDaysForLeader = (leaderId: string) => {
-    const isPresentEverywhere = DAYS.every(day => (leaderPresence[day] || []).includes(leaderId));
+    const isPresentEverywhere = days.every(day => (leaderPresence[day] || []).includes(leaderId));
     
     setLeaderPresence(prev => {
       const updated = { ...prev };
-      DAYS.forEach(day => {
+      days.forEach(day => {
         const current = updated[day] || [];
         if (isPresentEverywhere) {
           updated[day] = current.filter(id => id !== leaderId);
@@ -91,10 +97,9 @@ export const AdminView: React.FC<AdminViewProps> = ({
     const newId = Math.random().toString(36).substr(2, 9);
     setLeaders(prev => [...prev, { id: newId, name, role: 'LEITER' }]);
     
-    // Standardmäßig auf allen Tagen anwesend setzen
     setLeaderPresence(prev => {
       const updated = { ...prev };
-      DAYS.forEach(day => {
+      days.forEach(day => {
         updated[day] = [...(updated[day] || []), newId];
       });
       return updated;
@@ -142,19 +147,59 @@ export const AdminView: React.FC<AdminViewProps> = ({
         <p className="text-slate-400 text-xs font-bold uppercase tracking-widest">Systemverwaltung & Konfiguration</p>
       </div>
 
+      {/* ZEITRAUM KONFIGURATION */}
+      <section className="bg-white border border-slate-100 rounded-[2rem] overflow-hidden shadow-sm">
+        <button onClick={() => toggleSection('period')} className="flex items-center justify-between w-full px-8 py-6 hover:bg-slate-50 transition-colors">
+          <div className="flex items-center gap-4"><CalendarDays size={20} className="text-blue-600" /> <h3 className="text-lg font-bold text-slate-800 uppercase">Zeltlager-Zeitraum</h3></div>
+          {activeSection === 'period' ? <ChevronDown /> : <ChevronRight />}
+        </button>
+        {activeSection === 'period' && (
+          <div className="p-8 border-t border-slate-50 space-y-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+               <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Startdatum</label>
+                  <input 
+                    type="date" 
+                    value={startDate} 
+                    onChange={e => setStartDate(e.target.value)} 
+                    className="w-full bg-slate-50 border border-slate-100 p-4 rounded-2xl text-sm focus:ring-2 focus:ring-blue-100"
+                  />
+               </div>
+               <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Enddatum</label>
+                  <input 
+                    type="date" 
+                    value={endDate} 
+                    onChange={e => setEndDate(e.target.value)} 
+                    className="w-full bg-slate-50 border border-slate-100 p-4 rounded-2xl text-sm focus:ring-2 focus:ring-blue-100"
+                  />
+               </div>
+            </div>
+            <div className="bg-blue-50 p-4 rounded-2xl border border-blue-100">
+               <p className="text-[10px] text-blue-600 font-bold uppercase tracking-widest mb-2">Vorschau der generierten Tage:</p>
+               <div className="flex flex-wrap gap-2">
+                  {days.map(d => (
+                    <span key={d} className="px-3 py-1 bg-white rounded-lg text-[9px] font-black text-blue-500 shadow-sm border border-blue-50">{d}</span>
+                  ))}
+               </div>
+            </div>
+          </div>
+        )}
+      </section>
+
       {/* ANWESENHEIT */}
       <section className="bg-white border border-slate-100 rounded-[2rem] overflow-hidden shadow-sm">
         <button onClick={() => toggleSection('presence')} className="flex items-center justify-between w-full px-8 py-6 hover:bg-slate-50 transition-colors">
           <div className="flex items-center gap-4"><Check size={20} className="text-emerald-500" /> <h3 className="text-lg font-bold text-slate-800 uppercase">Anwesenheit</h3></div>
           <div className="flex items-center gap-2">
-            <span className="text-[10px] text-slate-400 font-bold uppercase mr-4">Doppelklick zum umschalten aller Tage</span>
+            <span className="hidden sm:inline text-[10px] text-slate-400 font-bold uppercase mr-4">Doppelklick zum umschalten aller Tage</span>
             {activeSection === 'presence' ? <ChevronDown /> : <ChevronRight />}
           </div>
         </button>
         {activeSection === 'presence' && (
-          <div className="p-8 border-t border-slate-50 overflow-x-auto">
+          <div className="p-8 border-t border-slate-50 overflow-x-auto no-scrollbar">
              <table className="w-full text-left text-xs">
-                <thead><tr><th className="pb-2 text-[10px] font-black text-slate-400 uppercase">Leiter</th>{DAYS.map(d => <th key={d} className="text-center font-black uppercase text-slate-400 px-2">{d.split(',')[1]}</th>)}</tr></thead>
+                <thead><tr><th className="pb-2 text-[10px] font-black text-slate-400 uppercase">Leiter</th>{days.map(d => <th key={d} className="text-center font-black uppercase text-slate-400 px-2">{d.split(', ')[1].split('.')[0]}</th>)}</tr></thead>
                 <tbody>{leaders.map(l => (
                   <tr key={l.id} className="border-t border-slate-50 hover:bg-slate-50/50">
                     <td 
@@ -164,10 +209,10 @@ export const AdminView: React.FC<AdminViewProps> = ({
                     >
                       {l.name}
                     </td>
-                    {DAYS.map(d => (
+                    {days.map(d => (
                       <td key={d} className="text-center">
                         <button onClick={() => setLeaderPresence(prev => ({ ...prev, [d]: (prev[d] || []).includes(l.id) ? prev[d].filter(id => id !== l.id) : [...(prev[d] || []), l.id] }))}>
-                          <div className={`w-6 h-6 rounded-lg mx-auto transition-all ${leaderPresence[d]?.includes(l.id) ? 'bg-emerald-500 shadow-md' : 'bg-slate-100'}`} />
+                          <div className={`w-5 h-5 rounded-lg mx-auto transition-all ${leaderPresence[d]?.includes(l.id) ? 'bg-emerald-500 shadow-md' : 'bg-slate-100'}`} />
                         </button>
                       </td>
                     ))}
@@ -201,7 +246,7 @@ export const AdminView: React.FC<AdminViewProps> = ({
             </div>
 
             <div className="pt-8 border-t border-slate-100 space-y-4">
-               <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Existierende Accounts (Passwort ändern möglich)</h4>
+               <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Existierende Accounts</h4>
                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                  {users.map(u => (
                    <div key={u.id} className="p-4 bg-slate-50 rounded-2xl border border-slate-100 space-y-3">
@@ -233,22 +278,6 @@ export const AdminView: React.FC<AdminViewProps> = ({
                           <p className="text-[8px] text-slate-400 text-center">Enter zum Speichern</p>
                        </div>
                      )}
-                   </div>
-                 ))}
-               </div>
-            </div>
-
-            <div className="pt-8 border-t border-slate-100 space-y-4">
-               <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Leiter-Pool (Schnelles Hinzufügen)</h4>
-               <div className="flex gap-2">
-                 <input value={leaderName} onChange={e => setLeaderName(e.target.value)} placeholder="Name des Leiters..." className="flex-1 bg-slate-50 p-4 rounded-2xl text-sm border-none focus:ring-2 focus:ring-slate-100" />
-                 <button onClick={() => addLeaderToPool(leaderName)} className="bg-slate-800 text-white p-4 rounded-2xl shadow-md"><Plus size={20} /></button>
-               </div>
-               <div className="flex flex-wrap gap-2">
-                 {leaders.map(l => (
-                   <div key={l.id} className="flex items-center gap-2 pl-4 pr-2 py-2 bg-slate-100 rounded-xl text-xs font-bold text-slate-600">
-                     {l.name}
-                     <button onClick={() => onDeleteLeader(l.id)} className="text-slate-300 hover:text-red-500"><Trash2 size={12} /></button>
                    </div>
                  ))}
                </div>
@@ -306,7 +335,6 @@ export const AdminView: React.FC<AdminViewProps> = ({
                            <span key={lId} className="px-3 py-1 bg-white border border-indigo-50 rounded-lg text-xs font-bold text-indigo-600">{leader.name}</span>
                          ) : null;
                        })}
-                       {(!m.standardLeaderIds || m.standardLeaderIds.length === 0) && <p className="text-[10px] text-slate-300 italic">Keine Standard-Leiter zugewiesen</p>}
                      </div>
 
                      {editingMarkerId === m.id && (
@@ -383,41 +411,6 @@ export const AdminView: React.FC<AdminViewProps> = ({
         )}
       </section>
 
-      {/* DEPLOYMENT & HOSTING */}
-      <section className="bg-white border border-slate-100 rounded-[2rem] overflow-hidden shadow-sm">
-        <button onClick={() => toggleSection('hosting')} className="flex items-center justify-between w-full px-8 py-6 hover:bg-slate-50 transition-colors">
-          <div className="flex items-center gap-4"><HardDrive size={20} className="text-indigo-500" /> <h3 className="text-lg font-bold text-slate-800 uppercase">Hosting & Umzug</h3></div>
-          {activeSection === 'hosting' ? <ChevronDown /> : <ChevronRight />}
-        </button>
-        {activeSection === 'hosting' && (
-          <div className="p-8 border-t border-slate-50 space-y-6">
-             <div className="bg-indigo-50 p-6 rounded-[2rem] border border-indigo-100 space-y-4">
-                <div className="flex items-center gap-3 text-indigo-800 font-bold">
-                   <Code size={20} /> <span className="text-sm uppercase tracking-widest font-black">Self-Hosting Guide</span>
-                </div>
-                <p className="text-xs text-indigo-600 leading-relaxed font-medium">
-                  Diese App ist vollständig statisch. Für den eigenen Server: Lade die <code className="bg-indigo-100 px-1 rounded">index.html</code> und alle <code className="bg-indigo-100 px-1 rounded">.tsx</code> Dateien in ein Verzeichnis auf deinem Webserver.
-                </p>
-                <div className="bg-slate-900 text-slate-300 p-5 rounded-2xl font-mono text-[10px] space-y-1 shadow-inner overflow-x-auto">
-                  <p className="text-emerald-400"># Dateien hochladen:</p>
-                  <p>/index.html</p>
-                  <p>/index.tsx</p>
-                  <p>/App.tsx</p>
-                  <p>/types.ts</p>
-                </div>
-             </div>
-             <button onClick={() => {
-                const config = { users, leaders, groups, timeSlots, markers, leaderPresence };
-                const blob = new Blob([JSON.stringify(config, null, 2)], { type: 'application/json' });
-                const link = document.createElement('a'); link.href = URL.createObjectURL(blob);
-                link.download = "zeltlager_init_config.json"; link.click();
-             }} className="w-full flex items-center justify-center gap-3 bg-slate-800 text-white py-5 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl hover:bg-slate-700">
-                <Download size={20} /> Konfiguration für Umzug exportieren
-             </button>
-          </div>
-        )}
-      </section>
-
       {/* BACKUP & IMPORT */}
       <section className="bg-white border border-slate-100 rounded-[2rem] overflow-hidden shadow-sm">
         <button onClick={() => toggleSection('backup')} className="flex items-center justify-between w-full px-8 py-6 hover:bg-slate-50 transition-colors">
@@ -454,7 +447,6 @@ export const AdminView: React.FC<AdminViewProps> = ({
                <AlertTriangle size={24} />
                <h3 className="text-lg font-black uppercase tracking-widest">Gefahrenzone</h3>
             </div>
-            <p className="text-[10px] text-red-500 font-bold uppercase tracking-wider">Diese Aktionen löschen Daten unwiderruflich!</p>
             <button onClick={onResetApp} className="w-full bg-white border-2 border-red-200 text-red-600 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-red-600 hover:text-white transition-all shadow-sm">
                Datenbank vollständig leeren
             </button>

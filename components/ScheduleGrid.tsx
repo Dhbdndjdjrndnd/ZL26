@@ -1,17 +1,20 @@
 
 import React from 'react';
 // Removed TimeSlot from imports as it is not exported from '../types'
-import { DAYS, TIME_SLOTS, ProgramPoint } from '../types';
+// Removed DAYS from imports as it is not exported from '../types'
+import { TIME_SLOTS, ProgramPoint } from '../types';
 import { Plus, Users, Wrench, ChevronRight } from 'lucide-react';
 
 interface ScheduleGridProps {
   program: ProgramPoint[];
+  // Added days prop to support dynamic date ranges from parent component
+  days: string[];
   onEdit: (point: ProgramPoint) => void;
   // Replaced non-existent TimeSlot type with string
   onAdd: (day: string, slot: string) => void;
 }
 
-export const ScheduleGrid: React.FC<ScheduleGridProps> = ({ program, onEdit, onAdd }) => {
+export const ScheduleGrid: React.FC<ScheduleGridProps> = ({ program, days, onEdit, onAdd }) => {
   // Replaced non-existent TimeSlot type with string
   const getProgramPoint = (day: string, slot: string) => {
     return program.find(p => p.day === day && p.timeSlot === slot);
@@ -23,7 +26,8 @@ export const ScheduleGrid: React.FC<ScheduleGridProps> = ({ program, onEdit, onA
         <thead>
           <tr className="bg-emerald-700 text-white">
             <th className="p-4 border-r border-emerald-600 sticky left-0 bg-emerald-700 z-10 w-32">Zeitslot</th>
-            {DAYS.map(day => (
+            {/* Use days prop instead of missing DAYS constant */}
+            {days.map(day => (
               <th key={day} className="p-4 min-w-[200px] border-r border-emerald-600 last:border-0">{day}</th>
             ))}
           </tr>
@@ -34,7 +38,8 @@ export const ScheduleGrid: React.FC<ScheduleGridProps> = ({ program, onEdit, onA
               <td className="p-4 font-semibold text-gray-700 border-r border-gray-100 sticky left-0 bg-white z-10">
                 {slot}
               </td>
-              {DAYS.map(day => {
+              {/* Use days prop instead of missing DAYS constant */}
+              {days.map(day => {
                 const point = getProgramPoint(day, slot);
                 return (
                   <td 

@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { User, LeaderAvailability, DAYS, GlobalLeader } from '../types';
+import { User, LeaderAvailability, GlobalLeader } from '../types';
 import { X, LogOut, Shield, User as UserIcon, BadgeCheck, Key, Check, CalendarCheck, Lock, Loader2 } from 'lucide-react';
 import { hashPassword } from '../services/securityUtils';
 
@@ -13,12 +13,14 @@ interface ProfileModalProps {
   setLeaderPresence: (pres: LeaderAvailability) => void;
   leaders: GlobalLeader[];
   addNotification: (msg: string, type?: 'error' | 'success' | 'info') => void;
+  days: string[];
 }
 
 export const ProfileModal: React.FC<ProfileModalProps> = ({ 
   user, onClose, onLogout, onUpdatePassword, 
   leaderPresence, setLeaderPresence, leaders,
-  addNotification
+  addNotification,
+  days
 }) => {
   const [showPasswordChange, setShowPasswordChange] = useState(false);
   const [newPassword, setNewPassword] = useState('');
@@ -102,9 +104,10 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Meine Anwesenheit</p>
               </div>
               <div className="grid grid-cols-5 gap-2">
-                {DAYS.map(day => {
+                {days.map(day => {
                   const isPresent = (leaderPresence[day] || []).includes(currentLeader.id);
-                  const dateShort = day.split(', ')[1].split('.')[0];
+                  const parts = day.split(', ');
+                  const dateShort = parts.length > 1 ? parts[1].split('.')[0] : "?";
                   return (
                     <button 
                       key={day}

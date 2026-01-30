@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { ProgramPoint, GlobalLeader, GlobalGroup, DAYS, DEFAULT_TIME_SLOTS, DEFAULT_MARKERS, TimeSlotConfig, GroupMarker, User, LeaderAvailability } from './types';
+import { ProgramPoint, GlobalLeader, GlobalGroup, DEFAULT_TIME_SLOTS, DEFAULT_MARKERS, TimeSlotConfig, GroupMarker, User, LeaderAvailability, generateDaysArray, DEFAULT_START_DATE, DEFAULT_END_DATE } from './types';
 import { TimelineView } from './components/TimelineView';
 import { ProgramModal } from './components/ProgramModal';
 import { KitchenView } from './components/KitchenView';
@@ -32,7 +32,13 @@ const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [users, setUsers] = useState<User[]>(INITIAL_USERS);
   const [activeTab, setActiveTab] = useState<'schedule' | 'kitchen' | 'admin'>('schedule');
-  const [selectedDay, setSelectedDay] = useState(DAYS[0]);
+  
+  // Datums-Management
+  const [startDate, setStartDate] = useState(localStorage.getItem('z_start_date') || DEFAULT_START_DATE);
+  const [endDate, setEndDate] = useState(localStorage.getItem('z_end_date') || DEFAULT_END_DATE);
+  const days = useMemo(() => generateDaysArray(startDate, endDate), [startDate, endDate]);
+  const [selectedDay, setSelectedDay] = useState(localStorage.getItem('z_sel_day') || days[0] || "");
+
   const [program, setProgram] = useState<ProgramPoint[]>([]);
   const [leaders, setLeaders] = useState<GlobalLeader[]>([]);
   const [groups, setGroups] = useState<GlobalGroup[]>([]);
@@ -61,11 +67,9 @@ const App: React.FC = () => {
     const adminLeaderIds = leaders.filter(l => adminNames.includes(l.name)).map(l => l.id);
 
     setMarkers(prev => prev.map(m => {
-      // "Leiter" (id: 1) oder "Alle" (id: 4) marker
       if (m.id === '1' || m.label === 'Leiter' || m.id === '4' || m.label === 'Alle') {
         return { ...m, standardLeaderIds: allLeaderIds };
       }
-      // "HL" (id: 6) marker
       if (m.id === '6' || m.label === 'HL') {
         return { ...m, standardLeaderIds: adminLeaderIds };
       }
@@ -119,6 +123,13 @@ const App: React.FC = () => {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  // Ensure selectedDay is valid when days change
+  useEffect(() => {
+    if (days.length > 0 && (!selectedDay || !days.includes(selectedDay))) {
+      setSelectedDay(days[0]);
+    }
+  }, [days, selectedDay]);
+
   // Persistence
   useEffect(() => {
     localStorage.setItem('z_prog', JSON.stringify(program));
@@ -128,7 +139,10 @@ const App: React.FC = () => {
     localStorage.setItem('z_slots', JSON.stringify(timeSlots));
     localStorage.setItem('z_markers', JSON.stringify(markers));
     localStorage.setItem('z_presence', JSON.stringify(leaderPresence));
-  }, [program, users, leaders, groups, timeSlots, markers, leaderPresence]);
+    localStorage.setItem('z_start_date', startDate);
+    localStorage.setItem('z_end_date', endDate);
+    localStorage.setItem('z_sel_day', selectedDay);
+  }, [program, users, leaders, groups, timeSlots, markers, leaderPresence, startDate, endDate, selectedDay]);
 
   const handleLogin = useCallback((user: User) => {
     const { password, ...userSafe } = user;
@@ -156,6 +170,8 @@ const App: React.FC = () => {
       setTimeSlots(DEFAULT_TIME_SLOTS);
       setMarkers(DEFAULT_MARKERS);
       setLeaderPresence({});
+      setStartDate(DEFAULT_START_DATE);
+      setEndDate(DEFAULT_END_DATE);
       addNotification("Datenbank vollständig zurückgesetzt.", "error");
     }
   }, [addNotification]);
@@ -172,11 +188,11 @@ const App: React.FC = () => {
     addNotification("KI analysiert die Datei...", "info");
     try {
       const text = await file.text();
-      const parsedPoints = await parseCsvData(text, DAYS, timeSlots.map(s => s.name));
+      const parsedPoints = await parseCsvData(text, days, timeSlots.map(s => s.name));
       
       const newProgramPoints: ProgramPoint[] = parsedPoints.map((p: any) => ({
         id: Math.random().toString(36).substr(2, 9),
-        day: p.day || DAYS[0],
+        day: p.day || days[0],
         timeSlot: p.timeSlot || (sortedTimeSlots.length > 0 ? sortedTimeSlots[0].name : 'Morgenprogramm'),
         startTime: p.startTime || '09:00',
         endTime: p.endTime || '12:00',
@@ -196,13 +212,14 @@ const App: React.FC = () => {
       setIsUploading(false);
       e.target.value = '';
     }
-  }, [timeSlots, sortedTimeSlots, addNotification]);
+  }, [timeSlots, sortedTimeSlots, addNotification, days]);
 
   const visibleDays = useMemo(() => {
     if (activeTab !== 'schedule') return [selectedDay];
-    const startIdx = DAYS.indexOf(selectedDay);
-    return DAYS.slice(startIdx, Math.min(startIdx + daysToShow, DAYS.length));
-  }, [selectedDay, daysToShow, activeTab]);
+    const startIdx = days.indexOf(selectedDay);
+    if (startIdx === -1) return days.length > 0 ? [days[0]] : [];
+    return days.slice(startIdx, Math.min(startIdx + daysToShow, days.length));
+  }, [selectedDay, daysToShow, activeTab, days]);
 
   const deleteUser = useCallback((userId: string) => {
     if (userId === '1') return addNotification("Der Haupt-Admin kann nicht gelöscht werden.", "error");
@@ -244,10 +261,10 @@ const App: React.FC = () => {
         </button>
       </header>
 
-      {activeTab !== 'admin' && activeTab !== 'kitchen' && (
+      {activeTab !== 'admin' && (
         <div className="bg-white/90 backdrop-blur-sm border-b border-slate-50 sticky top-16 z-40">
           <div className="flex gap-1 overflow-x-auto no-scrollbar py-2 px-6">
-            {DAYS.map((day) => {
+            {days.map((day) => {
               const isActive = selectedDay === day;
               const isToday = day.includes(new Date().toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' }));
               const [weekday, date] = day.split(', ');
@@ -280,7 +297,7 @@ const App: React.FC = () => {
           )}
           {activeTab === 'kitchen' && (
             <KitchenView 
-              program={program} days={DAYS} currentUser={currentUser}
+              program={program} days={days} currentUser={currentUser}
               onToggleMaterial={(pId, mId) => setProgram(prev => prev.map(p => p.id === pId ? { ...p, materials: p.materials.map(m => m.id === mId ? { ...m, checked: !m.checked } : m) } : p))} 
             />
           )}
@@ -291,8 +308,10 @@ const App: React.FC = () => {
               markers={markers} setMarkers={setMarkers} onCsvUpload={handleCsvUpload} isUploading={isUploading}
               leaderPresence={leaderPresence} setLeaderPresence={setLeaderPresence}
               addNotification={addNotification}
+              startDate={startDate} setStartDate={setStartDate}
+              endDate={endDate} setEndDate={setEndDate}
               onSystemExport={async (pass) => {
-                const backup = { program, users, leaders, groups, timeSlots, markers, leaderPresence, exportedAt: new Date().toISOString() };
+                const backup = { program, users, leaders, groups, timeSlots, markers, leaderPresence, startDate, endDate, exportedAt: new Date().toISOString() };
                 const encrypted = await encryptData(backup, pass);
                 const blob = new Blob([encrypted], { type: 'application/octet-stream' });
                 const url = URL.createObjectURL(blob);
@@ -309,6 +328,8 @@ const App: React.FC = () => {
                   const data = await decryptData(content, pass);
                   setProgram(data.program); setUsers(data.users); setLeaders(data.leaders); setGroups(data.groups);
                   setTimeSlots(data.timeSlots); setMarkers(data.markers); setLeaderPresence(data.leaderPresence);
+                  if (data.startDate) setStartDate(data.startDate);
+                  if (data.endDate) setEndDate(data.endDate);
                   addNotification("Backup erfolgreich eingespielt!", "success");
                 } catch (err) { addNotification("Fehler beim Import. Passwort falsch?", "error"); }
               }}
@@ -318,6 +339,7 @@ const App: React.FC = () => {
               onDeleteGroup={id => setGroups(prev => prev.filter(g => g.id !== id))}
               onUpdateUserPassword={(id, hash) => setUsers(prev => prev.map(u => u.id === id ? { ...u, password: hash } : u))}
               onResetApp={resetAppData}
+              days={days}
             />
           )}
       </main>
@@ -349,6 +371,7 @@ const App: React.FC = () => {
           onUpdatePassword={p => { setUsers(prev => prev.map(u => u.id === currentUser.id ? {...u, password: p} : u)); addNotification("Passwort geändert", "success"); }}
           leaderPresence={leaderPresence} setLeaderPresence={setLeaderPresence} leaders={leaders}
           addNotification={addNotification}
+          days={days}
         />
       )}
 
@@ -359,6 +382,7 @@ const App: React.FC = () => {
           onDelete={(id) => { if (window.confirm("Löschen?")) { setProgram(p => p.filter(x => x.id !== id)); setEditingPoint(null); addNotification("Gelöscht", "info"); } }}
           availableLeaders={leaders} availableGroups={groups} availableSlots={sortedTimeSlots} markers={markers} leaderPresence={leaderPresence}
           addNotification={addNotification}
+          days={days}
         />
       )}
     </div>

@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { ProgramPoint, GlobalLeader, GlobalGroup, GroupMarker, TimeSlotConfig, LeaderAvailability, ProcurementType } from '../types';
-import { X, Clock, MapPin, Package, Users, Star, ArrowLeft, CheckCircle2, Trash2, Tag, ShoppingCart, Hammer } from 'lucide-react';
+import { X, Clock, MapPin, Package, Users, Star, ArrowLeft, CheckCircle2, Trash2, Tag, ShoppingCart, Hammer, Calendar } from 'lucide-react';
 import { suggestMaterials } from '../services/geminiService';
 
 interface ProgramModalProps {
@@ -15,6 +15,7 @@ interface ProgramModalProps {
   markers: GroupMarker[];
   leaderPresence: LeaderAvailability;
   addNotification: (msg: string, type?: 'error' | 'success' | 'info') => void;
+  days: string[];
 }
 
 export const ProgramModal: React.FC<ProgramModalProps> = ({ 
@@ -27,7 +28,8 @@ export const ProgramModal: React.FC<ProgramModalProps> = ({
   availableSlots,
   markers,
   leaderPresence,
-  addNotification
+  addNotification,
+  days
 }) => {
   const [edited, setEdited] = useState<ProgramPoint>({ ...point });
   const [isSuggesting, setIsSuggesting] = useState(false);
@@ -49,7 +51,6 @@ export const ProgramModal: React.FC<ProgramModalProps> = ({
     const selectedMarker = markers.find(m => m.id === markerId);
     let newLeaders = [...edited.leaders];
 
-    // AUTOMATISCHE ZUWEISUNG: Wenn ein Marker gewählt wird, werden alle seine Standard-Leiter automatisch hinzugefügt
     if (selectedMarker && selectedMarker.standardLeaderIds) {
       selectedMarker.standardLeaderIds.forEach(leaderId => {
         const leaderObj = availableLeaders.find(l => l.id === leaderId);
@@ -130,11 +131,25 @@ export const ProgramModal: React.FC<ProgramModalProps> = ({
         <div className="px-8 pb-10 space-y-8 max-h-[75vh] overflow-y-auto no-scrollbar">
           <div className="space-y-4">
              <input value={edited.title} onChange={e => setEdited({ ...edited, title: e.target.value })} placeholder="TITEL..." className="w-full text-4xl font-serif font-bold text-slate-800 bg-transparent border-none focus:ring-0 outline-none p-0 uppercase placeholder:text-slate-200" />
-             <div className="flex flex-wrap gap-2">
+             
+             {/* Tag verschieben Selector */}
+             <div className="flex flex-wrap gap-2 items-center">
+                <div className="relative group">
+                  <select 
+                    value={edited.day} 
+                    onChange={e => setEdited({ ...edited, day: e.target.value })} 
+                    className="bg-slate-100 text-slate-600 text-[10px] font-black uppercase tracking-widest px-4 py-2 rounded-xl border-none cursor-pointer appearance-none shadow-sm pr-10 focus:ring-2 focus:ring-slate-200 transition-all"
+                  >
+                    {days.map(d => <option key={d} value={d}>{d}</option>)}
+                  </select>
+                  <Calendar size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                </div>
+                
                 <select value={edited.timeSlot} onChange={e => handleSlotChange(e.target.value)} className="bg-slate-800 text-white text-[10px] font-bold px-4 py-2 rounded-xl border-none cursor-pointer appearance-none shadow-sm">
                   <option value="">Individueller Slot</option>
                   {availableSlots.map(s => <option key={s.name} value={s.name}>{s.name} ({s.defaultStart})</option>)}
                 </select>
+
                 <div className="relative">
                   <select value={edited.markerId || ""} onChange={e => handleMarkerChange(e.target.value)} className="bg-white border border-slate-200 text-[10px] font-bold px-4 py-2 rounded-xl text-slate-600 outline-none cursor-pointer appearance-none pr-8 shadow-sm">
                     <option value="">Kein Gruppen-Marker</option>
